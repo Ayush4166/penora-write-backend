@@ -1,6 +1,4 @@
-import smtplib
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
+import resend
 from dotenv import load_dotenv
 import os
 from fastapi import APIRouter, HTTPException  # <-- FIXED: Added HTTPException import!
@@ -14,8 +12,9 @@ from pymongo import MongoClient
 
 load_dotenv()
 
-GMAIL_EMAIL = os.getenv("GMAIL_EMAIL")
-GMAIL_PASSWORD = os.getenv("GMAIL_PASSWORD")
+RESEND_API_KEY = os.getenv("RESEND_API_KEY")
+EMAIL_FROM = os.getenv("EMAIL_FROM", "onboarding@resend.dev")
+resend.api_key = RESEND_API_KEY
 
 MONGO_URL = os.getenv("MONGO_URL")
 client = MongoClient(MONGO_URL)
@@ -40,62 +39,33 @@ class GoogleLoginRequest(BaseModel):
 
 # Email sending function
 def send_welcome_email(user_email, user_name):
+    if not RESEND_API_KEY:
+        print("RESEND_API_KEY not set; skipping email")
+        return False
+
+    html = f"""
+    <p>Hi <strong>{user_name}</strong>,</p>
+    <p>Thank you for logging into <strong>Penora Write</strong>! 🎉</p>
+    <p>We're excited to have you on board. Start creating amazing stories with our AI-powered story generator today.</p>
+    <p><em>🚀 Tip: Try different story types - Funny, Sad, Adventure, Horror, Romance, and Sci‑Fi!</em></p>
+    <p>Best regards,<br><strong>Penora Write Team</strong></p>
+    """
+
     try:
-        message = MIMEMultipart('alternative')
-        message['Subject'] = 'Welcome to Penora Write!'
-        message['From'] = GMAIL_EMAIL
-        message['To'] = user_email
-
-        text = f"""\
-Hi {user_name},
-
-Thank you for logging into Penora Write!
-
-We're excited to have you on board. Start creating amazing stories with our AI-powered story generator today.
-
-Best regards,
-Penora Write Team
-        """
-
-        html = f"""\
-<html>
-  <body style="font-family: Arial, sans-serif; background-color: #f4f4f4; padding: 20px;">
-    <div style="background-color: white; padding: 30px; border-radius: 10px; max-width: 600px; margin: 0 auto;">
-      <h1 style="color: #333;">Welcome to Penora Write! 🎉</h1>
-      <p style="font-size: 16px; color: #555;">Hi <strong>{user_name}</strong>,</p>
-      <p style="font-size: 16px; color: #555;">
-        Thank you for logging into <strong>Penora Write</strong>!
-      </p>
-      <p style="font-size: 16px; color: #555;">
-        We're excited to have you on board. Start creating amazing stories with our AI-powered story generator today.
-      </p>
-      <div style="background-color: #f0f0f0; padding: 15px; border-radius: 5px; margin: 20px 0;">
-        <p style="color: #666; font-style: italic;">
-          🚀 Tip: Try different story types - Funny, Sad, Adventure, Horror, Romance, and Sci-Fi!
-        </p>
-      </div>
-      <p style="font-size: 14px; color: #888;">
-        Best regards,<br/>
-        <strong>Penora Write Team</strong>
-      </p>
-    </div>
-  </body>
-</html>
-        """
-
-        part1 = MIMEText(text, 'plain')
-        part2 = MIMEText(html, 'html')
-        message.attach(part1)
-        message.attach(part2)
-
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as server:
-            server.login(GMAIL_EMAIL, GMAIL_PASSWORD)
-            server.sendmail(GMAIL_EMAIL, user_email, message.as_string())
-        
+        r = resend.Emails.send(
+            {
+                "from": EMAIL_FROM,
+                "to": [user_email],
+                "subject": "Welcome to Penora Write!",
+                "html": html,
+            }
+        )
+        print("Resend email response:", r)
         return True
     except Exception as e:
-        print(f"Error sending email: {e}")
+        print(f"Resend email error: {e}")
         return False
+
 
 # Router
 router = APIRouter()
