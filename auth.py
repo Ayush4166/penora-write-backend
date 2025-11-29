@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import os
 from fastapi import APIRouter, HTTPException  # <-- FIXED: Added HTTPException import!
 from pydantic import BaseModel
-import jwt
+from jose import jwt
 import datetime
 from google.oauth2 import id_token
 from google.auth.transport import requests
